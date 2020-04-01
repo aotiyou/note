@@ -4,7 +4,7 @@ abstract class 和 interface 是支持抽象类定义的两种机制。
 
 ![image-20200325110050106](C:\Users\zxy\AppData\Roaming\Typora\typora-user-images\image-20200325110050106.png)
 
-interface 可以继承 interface
+interface 可以继承 interface， interface 不可以实现interface
 
 abstract 可以实现 interface
 
