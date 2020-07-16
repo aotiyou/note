@@ -1,6 +1,10 @@
+全面分析Spring的编程式事务管理及声明式事务管理
+
 https://juejin.im/post/5b00c52ef265da0b95276091
 
-## 事务的特性（ACID）
+https://developer.ibm.com/zh/articles/os-cn-spring-trans/
+
+# 事务的特性（ACID）
 
 **1.原子性**：事务是最小的执行单位，不允许分割。事务的原子性确保动作要么全部完成，要么完全不起作用；
 
@@ -10,15 +14,23 @@ https://juejin.im/post/5b00c52ef265da0b95276091
 
 **4.持久性**：一个事务被提交之后，它对数据库中数据的改变时持久的，即使数据库发生故障也不应该对其有任何影响。
 
+# Spring事务管理API分析
+
 Spring事务管理接口
 
 * PlatformTransactionManager：（平台）事务管理器
 * TransctionDefinition：事务定义信息（事务隔离级别、传播行为、超时、只读、回滚规则）
 * TransactionStatus：事务运行状态
 
-**所谓事务管理，起始就是“按照给定的事务规则来执行提交或者回滚操作”**
+**所谓事务管理，其实就是“按照给定的事务规则来执行提交或者回滚操作”**
 
-PlatformTransactionManager接口
+**给定的事物规则，就是用TransactionDefinition表示**
+
+**按照...来执行提交或者回滚操作，便是用PlatformTransactionManager表示**
+
+**TransactionStatus用于表示一个运行着的事务的状态**
+
+# PlatformTransactionManager
 
 Spring并不直接管理事务，而是提供了多种事务管理器。
 
@@ -46,7 +58,7 @@ Spring中PlatformTransactionManager根据不同持久层框架所对应的接口
 | org.springframework.orm.jpa.JpaTransactionManager            | 使用JPA进行数据持久化时使用                   |
 |  org.springframework.jta.JtaTransactionManager  |  使用一个JTA实现来管理事务，在一个事务跨越多个资源时使用  |
 
-TransactionDefinition接口
+# TransactionDefinition
 
 事务管理器接口PlatformTransactionManager通过getTransaction(TransactionDefinition definition)方法来得到一个事务，这个方法里面的参数就是TransactionDefinition类，这个类就定义了一些基本的事务属性。
 
@@ -61,6 +73,31 @@ TransactionDefinition接口
 * 回滚规则
 * 是否只读
 * 事务超时
+
+# TransactionStatus
+
+TransactionStatus接口用来记录事务的状态 该接口定义了一组方法，用来获取或判断事务的相应状态信息
+
+PlatformTransactionManager.gerTransaction(...)方法返回一个TransactionStatus对象。返回的TransactionStatus对象可能代表一个新的或已经存在的事务（如果在当前调用堆栈有一个符合条件的事务）
+
+TransactionStatus接口内容如下：
+
+```java
+public interface TransactionStatus{
+    // 是否是新的事物
+    boolean isNewTransaction();
+    // 是否有恢复点
+    boolean hasSavepoint();
+    // 设置为只回滚
+    void setRollbackOnly();
+    // 是否为只回滚
+    boolean isRollbackOnly();
+    // 是否已完成
+    boolean isCompleted;
+}
+```
+
+# Spring事务属性分析
 
 TransactionDefinition定义了5个方法以及一些表示事务属性的常量比如隔离级别、传播行为等等常量。
 
@@ -101,7 +138,7 @@ TransactionDefiniton接口定义了五个表示隔离级别的常量。
 
 例2（同样的条件, 第1次和第2次读出来的记录数不一样 ）：假某工资单表中工资大于3000的有4人，事务1读取了所有工资大于3000的人，共查到4条记录，这时事务2 又插入了一条工资大于3000的记录，事务1再次读取时查到的记录就变为了5条，这样就导致了幻读。
 
-隔离级别
+# 事务隔离级别
 
 TransactionDefinition接口中定义了五个表示隔离级别的常量：
 
@@ -118,7 +155,9 @@ TransactionDefinition接口中定义了五个表示隔离级别的常量：
 
 * ISOLATION_SERIALIZABLE = 8：最高的隔离级别，完全服从CAID的隔离级别。**该级别可以防止脏读、不可重复读以及幻读**。但是这将严重影响程序的性能。通常情况下也不会用到该级别。
 
-事务传播行为（为了解决业务层方法之间互相调用的事务问题）
+# 事务传播行为
+
+（为了解决业务层方法之间互相调用的事务问题）
 
 当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。在TransactionDefinition定义中包括了如下几个表示传播行为的常量：
 
@@ -140,6 +179,8 @@ TransactionDefinition接口中定义了五个表示隔离级别的常量：
 
 前六中事务传播行为是Spring从EJB中引入的，他们共享相同的概念。而PROPAGATION_NESTED是Spring所特有的。以PROPAGATION_NESTED启动的事务内嵌与外部事务中（如果存在外部事务的话），此时，内嵌事务并不是一个独立的事务，它依赖于外部事务的存在，只有通过外部的事务提交，才能引起内部事务的提交，嵌套的自事务不能单独提交。如果熟悉 JDBC 中的保存点（SavePoint）的概念，那嵌套事务就很容易理解了，其实嵌套的子事务就是保存点的一个应用，一个事务中可以包括多个保存点，每一个嵌套子事务。另外，外部事务的回滚也会导致嵌套子事务的回滚。
 
+# 事务超时
+
 事务超时属性（一个事务允许执行的最长时间）
 
 ```
@@ -156,16 +197,17 @@ default boolean isReadOnly() {
 }
 ```
 
+# 事务的只读属性
+
 事务的只读属性是指，对事务性资源进行只读操作或者是读写操作。所谓事务性资源就是指那些被事务管理的资源，比如数据源、JMS资源，以及自定的事务性资源等等。如果确定只对事务性资源惊醒只读操作，那么我们可以量事务标志为只读的，以提高事务处理的性能。在TransactionDefinition中以boolean类型来表示事务是否只读。
 
-回滚规则（定义事务回滚规则）
+# 事务的回滚规则
+
+（定义事务回滚规则）
 
 这些规则定义了哪些异常会导致事务回滚而哪些不会。默认情况下，事务只有遇到运行期异常时才会回滚，而在遇到检查型异常时不会回滚（这一行为与EJB的回滚行为是一致的）。但是你可以声明事务在遇到特定的检查型异常时像遇到运行期异常那样回滚。同样，你还可以声明事务遇到特定的异常不会滚，即使这些异常是运行期异常。
 
-TransactionStatus接口
+# 编程式事务管理
 
-TransactionStatus接口用来记录事务的状态 该接口定义了一组方法，用来获取或判断事务的相应状态信息
+## Spring的编程式事务管理概述
 
-PlatformTransactionManager.gerTransaction(...)方法返回一个TransactionStatus对象。返回的TransactionStatus对象可能代表一个新的或已经存在的事务（如果在当前调用堆栈有一个符合条件的事务）
-
-T
